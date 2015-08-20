@@ -6,3 +6,4 @@ import LTS
 main :: IO ()
 main = do
           putStrLn ""
+          

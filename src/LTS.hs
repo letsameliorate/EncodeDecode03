@@ -30,6 +30,13 @@ eqLTS c (Var x l) (Var x' l') = eqLTS c l l'
 eqLTS c (Embedding f l) (Embedding f' l') = (f,f') `elem` c
 eqLTS c l l' = False
 
+root (Node t ls) = t
+root (Unfold f t l) = t
+root (ConElim c t l) = t
+root (Function f l) = root l
+root (Var x l) = root l
+root (Embedding f l) = root l
+
 freeLTS l = freeLTS' [] l
 
 freeLTS' xs (Node (Free x) []) = if x `elem` xs then xs else x:xs
@@ -39,6 +46,26 @@ freeLTS' xs (ConElim c _ l) = freeLTS' xs l
 freeLTS' xs (Function f l) = freeLTS' xs l
 freeLTS' xs (Var x l) = freeLTS' xs l
 freeLTS' xs (Embedding f l) = xs
+
+embeddings es (Node _ ls) = foldr (\l es -> embeddings es l) es ls
+embeddings es (Unfold _ _ l) = embeddings es l
+embeddings es (ConElim _ _ l) = embeddings es l
+embeddings es (Function f l) = embeddings es l
+embeddings es (Var x l) = embeddings es l
+embeddings es (Embedding e _) = if e `elem` es then es else e:es
+
+abstractLTS x l = abstractLTS' 0 x l
+abstractLTS' i x (Node (Free x') []) = if x==x' then Node (Bound i) [] else Node (Free x') []
+abstractLTS' i x (Node (Bound i') []) = if i'>=i then Node (Bound (i'+1)) [] else Node (Bound i') []
+abstractLTS' i x (Node (Lambda x' t) [l]) = Node (Lambda x' t) [abstractLTS' (i+1) x l]
+abstractLTS' i x (Node (Case t bs) (l:ls)) = Node (Case t bs) ((abstractLTS' i x l):(map (\((c,xs,t),l) -> abstractLTS' (i + length xs) x l) (zip bs ls)))
+abstractLTS' i x (Node (Let x' t u) [l,l']) = Node (Let x' t u) [abstractLTS' i x l,abstractLTS' (i+1) x l']
+abstractLTS' i x (Node t ls) = Node t (map (abstractLTS' i x) ls)
+abstractLTS' i x (Unfold f t l) = Unfold f t (abstractLTS' i x l)
+abstractLTS' i x (ConElim c t l) = ConElim c t (abstractLTS' i x l)
+abstractLTS' i x (Function f l) = Function f (abstractLTS' i x l)
+abstractLTS' i x (Var x' l) = Var x' (abstractLTS' i x l)
+abstractLTS' i x (Embedding f l) = Embedding f (abstractLTS' i x l)
 
 substLTS l l' = substLTS' 0 l l'
 substLTS' i l (Node (Free x') []) = Node (Free x') []

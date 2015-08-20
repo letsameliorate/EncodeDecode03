@@ -1,5 +1,10 @@
 module Term where
 
+import Data.Char
+import Data.Maybe
+import Data.List (intersect,(\\))
+import Data.Foldable (foldrM,find)
+import Control.Monad
 import Text.PrettyPrint.HughesPJ
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -53,6 +58,34 @@ free' xs (Fun f) = xs
 free' xs (Case t bs) = foldr (\(c,xs,t) xs' -> free' xs' t) (free' xs t) bs
 free' xs (Let x t u) = free' (free' xs t) u
 free' xs (Where t ds) = foldr (\(x,t) xs -> free' xs t) (free' xs t) ds
+
+embed t u = couple t u []
+
+embedding t u s = mplus (couple t u s) (dive t u s)
+
+couple (Free x) (Free x') s = if x `elem` fst (unzip s)
+                              then if (x,x') `elem` s then Just s else Nothing
+                              else Just ((x,x'):s)
+couple (Bound i) (Bound i') s | i == i' = Just s
+couple (Lambda _ t) (Lambda _' t') s = embedding t t' s
+couple u@(Con c' ts) u'@(Con c'' ts') s | match u u' = foldrM (\ (t,t') s -> embedding t t' s) s (zip ts ts')
+couple (Apply t u) (Apply t' u') s | match t t' = (embedding t t' s) >>= (embedding u u')
+couple (Fun f) (Fun f') s | f==f' = Just s
+couple u@(Case t bs) u'@(Case t' bs') s | match u u' = (embedding t t' s) >>= (\s->foldrM (\ ((_,_,t),(_,_,t')) s -> embedding t t' s) s (zip bs bs'))
+couple (Let _ t u) (Let _ t' u') s = (embedding t t' s) >>= (embedding u u')
+couple (Where t ds') (Where t' ds'') s = let (vs,ts) = unzip ds'
+                                             (vs',ts') = unzip ds''
+                                         in (embedding t t' s) >>= (\s -> foldrM (\(t,t') s -> embedding t t' s) s (zip ts ts'))
+
+couple t u s = Nothing
+
+dive t (Lambda x t') s = embedding t t' s
+dive t (Con c ts) s = msum (map (\t' -> embedding t t' s) ts)
+dive t (Apply t' u) s = mplus (embedding t t' s) (embedding t u s)
+dive t (Case t' bs) s = mplus (embedding t t' s) (msum (map (\(_,vs,t') -> embedding t (shift (length vs) 0 t') s) bs))
+dive t (Let x t' u) s = mplus (embedding t t' s) (embedding t u s)
+dive t (Where t' ds') s = embedding t t' s
+dive t u s = Nothing
 
 shift 0 d u = u
 shift i d (Free x) = Free x
