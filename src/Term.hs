@@ -273,10 +273,10 @@ fundef = do
 expr = buildExpressionParser prec term
 
 prec = [ [ unop "~" (Fun "not")],
-         [ op "+" (Fun "plus") AssocRight ],
-         [ op "-" (Fun "minus") AssocRight ],
-         [ op "*" (Fun "mult") AssocRight ],
-         [ op "/" (Fun "div") AssocRight ],
+         --[ op "+" (Fun "plus") AssocRight ],
+         --[ op "-" (Fun "minus") AssocRight ],
+         --[ op "*" (Fun "mult") AssocRight ],
+         --[ op "/" (Fun "div") AssocRight ],
          [ op "/\\" (Fun "and") AssocRight ],
          [ op "\\/" (Fun "or") AssocRight ],
          [ op "<=>" (Fun "iff") AssocRight ],

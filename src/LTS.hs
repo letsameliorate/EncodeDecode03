@@ -1,6 +1,7 @@
 module LTS where
 
 import Term
+import Data.Foldable (foldrM,find)
 import Text.PrettyPrint.HughesPJ
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -46,6 +47,34 @@ freeLTS' xs (ConElim c _ l) = freeLTS' xs l
 freeLTS' xs (Function f l) = freeLTS' xs l
 freeLTS' xs (Var x l) = freeLTS' xs l
 freeLTS' xs (Embedding f l) = xs
+
+genvars l = genvars' [] l
+
+genvars' xs (Node (Free x) []) = xs
+genvars' xs (Node t ls) = foldr (\l xs -> genvars' xs l) xs ls
+genvars' xs (Unfold f t l) = genvars' xs l
+genvars' xs (ConElim c _ l) = genvars' xs l
+genvars' xs (Function f l) = genvars' xs l
+genvars' xs (Var x l) = if x `elem` xs then xs else x:xs
+genvars' xs (Embedding f l) = xs
+
+instanceLTS c (Node (Free x) []) (Node (Free x') []) s = if   x `elem` fst (unzip s)
+                                                         then if (x,Node (Free x') []) `elem` s then Just s else Nothing
+                                                         else Just ((x,Node (Free x') []):s)
+instanceLTS c (Node (Free x) []) l s | x `elem` (freeLTS l) = if x `elem` fst (unzip s)
+                                                              then if (x,l) `elem` s then Just s else Nothing
+                                                              else Just ((x,l):s)
+instanceLTS c (Node t ls) (Node t' ls') s | match t t' = foldrM (\ (l,l') s -> instanceLTS c l l' s) s (zip ls ls')
+instanceLTS c (Unfold f t l) (Unfold f' t' l') s | (f,f') `elem` c = instanceLTS c l l' s
+instanceLTS c l (Unfold _ _ l') s = instanceLTS c l l' s
+instanceLTS c (ConElim c' _ l) (ConElim c'' _ l') s | c'==c'' = instanceLTS c l l' s
+instanceLTS c l (ConElim _ _ l') s = instanceLTS c l l' s
+instanceLTS c (Function f l) (Function f' l') s = instanceLTS ((f,f'):c) l l' s
+instanceLTS c (Embedding f l) (Embedding f' l') s | (f,f') `elem` c = Just s
+instanceLTS c (Var x _) l s = if   x `elem` fst (unzip s)
+                              then if (x,l) `elem` s then Just s else Nothing
+                              else if x `elem` genvars l then Just ((x,l):s) else Nothing
+instanceLTS c t t' s = Nothing
 
 embeddings es (Node _ ls) = foldr (\l es -> embeddings es l) es ls
 embeddings es (Unfold _ _ l) = embeddings es l
