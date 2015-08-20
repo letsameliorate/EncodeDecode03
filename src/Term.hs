@@ -16,6 +16,9 @@ data Term = Free String
           | Let String Term Term
           | Where Term [(String, Term)]
 
+instance Show Term where
+   show t = render (prettyTerm t)
+
 instance Eq Term where
    (==) (Free x) (Free x') = x==x'
    (==) (Bound i) (Bound i') = i==i'
